@@ -29,46 +29,73 @@ public class SecurityConfig {
             throws Exception {
 
         http
+            // CORS
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+            // CSRF (REST API using JWT)
             .csrf(csrf -> csrf.disable())
 
+            // Authorization
             .authorizeHttpRequests(auth -> auth
 
+                // Allow browser preflight requests
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                 // Login and signup
                 .requestMatchers("/api/auth/**").permitAll()
 
                 // Public product viewing
-                .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**")
-                    .permitAll()
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/products",
+                    "/api/products/**"
+                ).permitAll()
 
-                // Admin product management
-                .requestMatchers(HttpMethod.POST, "/api/products/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/products/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasRole("ADMIN")
+                // Admin-only product management
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/products",
+                    "/api/products/**"
+                ).hasRole("ADMIN")
 
-                // Orders
+                .requestMatchers(
+                    HttpMethod.PUT,
+                    "/api/products",
+                    "/api/products/**"
+                ).hasRole("ADMIN")
+
+                .requestMatchers(
+                    HttpMethod.DELETE,
+                    "/api/products",
+                    "/api/products/**"
+                ).hasRole("ADMIN")
+
+                // Orders require authentication
                 .requestMatchers("/api/orders/**").authenticated()
 
-                // Payment webhook
+                // Public Razorpay webhook
                 .requestMatchers("/api/payment/webhook").permitAll()
 
-                // Other payment endpoints
+                // Payment operations require authentication
                 .requestMatchers("/api/payment/create/**").authenticated()
-                .requestMatchers(HttpMethod.POST, "/api/payment/verify").authenticated()
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/payment/verify"
+                ).authenticated()
 
-                // Admin jobs
+                // Admin-only background jobs
                 .requestMatchers("/api/jobs/**").hasRole("ADMIN")
 
-                // All remaining endpoints
+                // Protect all other endpoints
                 .anyRequest().authenticated()
             )
 
+            // Stateless JWT sessions
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
 
+            // JWT filter
             .addFilterBefore(
                 jwtAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class
@@ -77,22 +104,28 @@ public class SecurityConfig {
         return http.build();
     }
 
+    // CORS configuration
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
 
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(List.of(
+        configuration.setAllowedOriginPatterns(List.of(
             "http://localhost:5173",
-            "https://m-tech-e-commerce-deployment.vercel.app",
-            "https://m-tech-e-commerce-deployment-sqs80cxfy-mt-ech-project1.vercel.app"
+            "https://m-tech-e-commerce-deployment-*.vercel.app",
+            "https://m-tech-e-commerce-deployment.vercel.app"
         ));
 
         configuration.setAllowedMethods(List.of(
-            "GET", "POST", "PUT", "DELETE", "OPTIONS"
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "OPTIONS"
         ));
 
         configuration.setAllowedHeaders(List.of("*"));
+
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source =
