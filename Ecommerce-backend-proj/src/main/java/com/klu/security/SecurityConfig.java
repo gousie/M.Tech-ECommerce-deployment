@@ -25,126 +25,50 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http)
+            throws Exception {
 
         http
-            // ==============================
-            // CORS
-            // ==============================
-            .cors(cors -> cors
-                .configurationSource(corsConfigurationSource())
-            )
-
-            // ==============================
-            // CSRF
-            // ==============================
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
 
-            // ==============================
-            // AUTHORIZATION
-            // ==============================
             .authorizeHttpRequests(auth -> auth
 
-                // OPTIONS requests
-                .requestMatchers(HttpMethod.OPTIONS, "/**")
-                .permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // Authentication APIs
-                .requestMatchers("/api/auth/**")
-                .permitAll()
+                // Login and signup
+                .requestMatchers("/api/auth/**").permitAll()
 
-                // ==============================
-                // PRODUCTS
-                // ==============================
+                // Public product viewing
+                .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**")
+                    .permitAll()
 
-                // Anyone can view products
-                .requestMatchers(
-                    HttpMethod.GET,
-                    "/api/products/**"
-                )
-                .permitAll()
+                // Admin product management
+                .requestMatchers(HttpMethod.POST, "/api/products/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/products/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasRole("ADMIN")
 
-                // Only ADMIN can create products
-                .requestMatchers(
-                    HttpMethod.POST,
-                    "/api/products/**"
-                )
-                .hasRole("ADMIN")
+                // Orders
+                .requestMatchers("/api/orders/**").authenticated()
 
-                // Only ADMIN can update products
-                .requestMatchers(
-                    HttpMethod.PUT,
-                    "/api/products/**"
-                )
-                .hasRole("ADMIN")
+                // Payment webhook
+                .requestMatchers("/api/payment/webhook").permitAll()
 
-                // Only ADMIN can delete products
-                .requestMatchers(
-                    HttpMethod.DELETE,
-                    "/api/products/**"
-                )
-                .hasRole("ADMIN")
+                // Other payment endpoints
+                .requestMatchers("/api/payment/create/**").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/payment/verify").authenticated()
 
-                // ==============================
-                // ORDERS
-                // ==============================
-
-                .requestMatchers(
-                    HttpMethod.POST,
-                    "/api/orders"
-                )
-                .authenticated()
-
-                .requestMatchers(
-                    "/api/orders/**"
-                )
-                .authenticated()
-
-                // ==============================
-                // PAYMENT
-                // ==============================
-
-                // Razorpay webhook must be public
-                .requestMatchers(
-                    "/api/payment/webhook"
-                )
-                .permitAll()
-
-                // Create payment requires login
-                .requestMatchers(
-                    "/api/payment/create/**"
-                )
-                .authenticated()
-
-                // Verify payment requires login
-                .requestMatchers(
-                    HttpMethod.POST,
-                    "/api/payment/verify"
-                )
-                .authenticated()
-
-                // ==============================
-                // EVERYTHING ELSE
-                // ==============================
-
-                // MUST ALWAYS BE LAST
+                // Admin jobs
                 .requestMatchers("/api/jobs/**").hasRole("ADMIN")
-                .anyRequest()
-                .authenticated()
+
+                // All remaining endpoints
+                .anyRequest().authenticated()
             )
 
-            // ==============================
-            // SESSION MANAGEMENT
-            // ==============================
             .sessionManagement(session ->
-                session.sessionCreationPolicy(
-                    SessionCreationPolicy.STATELESS
-                )
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
 
-            // ==============================
-            // JWT FILTER
-            // ==============================
             .addFilterBefore(
                 jwtAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class
@@ -153,43 +77,28 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // =====================================================
-    // CORS CONFIGURATION
-    // =====================================================
-
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
 
-        CorsConfiguration configuration =
-            new CorsConfiguration();
+        CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(
-            List.of("http://localhost:5173",
-            "https://m-tech-e-commerce-deployment.vercel.app")
-        );
-
-
-        configuration.setAllowedMethods(List.of(
-            "GET",
-            "POST",
-            "PUT",
-            "DELETE",
-            "OPTIONS"
+        configuration.setAllowedOrigins(List.of(
+            "http://localhost:5173",
+            "https://m-tech-e-commerce-deployment.vercel.app",
+            "https://m-tech-e-commerce-deployment-sqs80cxfy-mt-ech-project1.vercel.app"
         ));
 
-        configuration.setAllowedHeaders(
-            List.of("*")
-        );
+        configuration.setAllowedMethods(List.of(
+            "GET", "POST", "PUT", "DELETE", "OPTIONS"
+        ));
 
+        configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source =
             new UrlBasedCorsConfigurationSource();
 
-        source.registerCorsConfiguration(
-            "/**",
-            configuration
-        );
+        source.registerCorsConfiguration("/**", configuration);
 
         return source;
     }
